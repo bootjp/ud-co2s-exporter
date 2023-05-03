@@ -18,15 +18,6 @@ func TestParser(t *testing.T) {
 			nil,
 		},
 		{
-			"CO2=1012,HUM=35.2,TMP=29.6\n\r",
-			Status{
-				co2:  1012,
-				hum:  35.2,
-				temp: 29.6,
-			},
-			nil,
-		},
-		{
 			"CO2=1012,HUM=35.2,TMP=29.6\r\n",
 			Status{
 				co2:  1012,

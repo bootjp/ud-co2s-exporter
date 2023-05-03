@@ -25,13 +25,12 @@ var logger = log.Default()
 var ErrInvalidFormat = errors.New("invalid format")
 
 func parser(data string) (Status, error) {
-	line := strings.Replace(data, "\r", "", -1)
-	line = strings.Replace(line, "\n", "", -1)
-	splits := strings.Split(line, ",")
+	data = strings.TrimSuffix(data, "\r\n")
+	splits := strings.Split(data, ",")
 	result := Status{}
 
 	if len(splits) != 3 {
-		logger.Println("invalid format", line)
+		logger.Println("invalid format", data)
 		return Status{}, ErrInvalidFormat
 	}
 
@@ -62,7 +61,7 @@ func parser(data string) (Status, error) {
 func recordMetrics() {
 	port, err := serial.Open(*deviceName, &serial.Mode{})
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 	mode := &serial.Mode{
 		BaudRate: 115200,
@@ -75,14 +74,27 @@ func recordMetrics() {
 	}
 	_, err = port.Write([]byte("STA\r\n"))
 	if err != nil {
-		logger.Println(err)
+		logger.Fatalln(err)
 	}
 
+	defer func() {
+		if _, err = port.Write([]byte("STP\r\n")); err != nil {
+			logger.Fatalln(err)
+		}
+		if err := port.Close(); err != nil {
+			logger.Fatalln(err)
+		}
+	}()
+
 	scanner := bufio.NewScanner(port)
+	// skip first 2 lines for command response
+	scanner.Scan()
+	scanner.Scan()
+
 	for scanner.Scan() {
 		stat, err := parser(scanner.Text())
 		if err != nil {
-			log.Println(err)
+			logger.Println(err)
 			continue
 		}
 
