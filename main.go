@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"log"
 	"net/http"
@@ -23,9 +24,8 @@ type Status struct {
 var logger = log.Default()
 var ErrInvalidFormat = errors.New("invalid format")
 
-func parser(data []byte) (Status, error) {
-	line := string(data)
-	line = strings.Replace(line, "\r", "", -1)
+func parser(data string) (Status, error) {
+	line := strings.Replace(data, "\r", "", -1)
 	line = strings.Replace(line, "\n", "", -1)
 	splits := strings.Split(line, ",")
 	result := Status{}
@@ -51,7 +51,7 @@ func parser(data []byte) (Status, error) {
 			result.temp, err = strconv.ParseFloat(keyValue[1], 64)
 		}
 		if err != nil {
-			logger.Println(err, keyValue[1])
+			logger.Println(err, split)
 			return Status{}, ErrInvalidFormat
 		}
 	}
@@ -71,24 +71,16 @@ func recordMetrics() {
 		StopBits: serial.OneStopBit,
 	}
 	if err := port.SetMode(mode); err != nil {
-		logger.Fatal(err)
+		logger.Fatalln(err)
 	}
 	_, err = port.Write([]byte("STA\r\n"))
 	if err != nil {
 		logger.Println(err)
 	}
 
-	buff := make([]byte, 256)
-	for {
-		n, err := port.Read(buff)
-		if err != nil {
-			logger.Fatalln(err)
-		}
-		if n == 0 {
-			continue
-		}
-
-		stat, err := parser(buff[:n])
+	scanner := bufio.NewScanner(port)
+	for scanner.Scan() {
+		stat, err := parser(scanner.Text())
 		if err != nil {
 			log.Println(err)
 			continue
