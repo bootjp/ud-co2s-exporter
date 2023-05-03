@@ -3,21 +3,51 @@ package main
 import "testing"
 
 func TestParser(t *testing.T) {
-	stat, err := parser([]byte("CO2=1012,HUM=35.2,TMP=29.6"))
-
-	if err != nil {
-		t.Error(err)
+	tests := []struct {
+		in  []byte
+		out Status
+	}{
+		{
+			[]byte("CO2=1012,HUM=35.2,TMP=29.6"),
+			Status{
+				co2:  1012,
+				hum:  35.2,
+				temp: 29.6,
+			},
+		},
+		{
+			[]byte("CO2=1012,HUM=35.2,TMP=29.6\n\r"),
+			Status{
+				co2:  1012,
+				hum:  35.2,
+				temp: 29.6,
+			},
+		},
+		{
+			[]byte("CO2=1012,HUM=35.2,TMP=29.6\r\n"),
+			Status{
+				co2:  1012,
+				hum:  35.2,
+				temp: 29.6,
+			},
+		},
+		{
+			[]byte("CO2=90,HUM=1.0,TMP=1\r\n"),
+			Status{
+				co2:  90,
+				hum:  1.0,
+				temp: 1,
+			},
+		},
 	}
 
-	if stat.co2 != 1012 {
-		t.Errorf("CO2: %f", stat.co2)
-	}
-
-	if stat.hum != 35.2 {
-		t.Errorf("HUM: %f", stat.hum)
-
-	}
-	if stat.temp != 29.6 {
-		t.Errorf("TMP: %f", stat.temp)
+	for _, tt := range tests {
+		stat, err := parser(tt.in)
+		if err != nil {
+			t.Error(err)
+		}
+		if stat != tt.out {
+			t.Errorf("got %v, want %v", stat, tt.out)
+		}
 	}
 }

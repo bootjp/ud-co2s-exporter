@@ -6,11 +6,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.bug.st/serial"
 )
 
@@ -21,7 +20,6 @@ type Status struct {
 }
 
 func parser(data []byte) (Status, error) {
-	// CO2=1012,HUM=35.2,TMP=29.6
 	line := string(data)
 	line = strings.Replace(line, "\r", "", -1)
 	line = strings.Replace(line, "\n", "", -1)
@@ -52,7 +50,7 @@ func parser(data []byte) (Status, error) {
 }
 
 func recordMetrics() {
-	port, err := serial.Open("/dev/ttyACM0", &serial.Mode{})
+	port, err := serial.Open(*deviceName, &serial.Mode{})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -106,12 +104,40 @@ var (
 	})
 )
 
-func main() {
+func run() error {
 	go recordMetrics()
 
 	http.Handle("/metrics", promhttp.Handler())
-	err := http.ListenAndServe(":2233", nil)
+	http.HandleFunc("/", func(w http.ResponseWriter, request *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		// language=HTML
+		_, err := w.Write([]byte(`<html>
+    <head><title>UD-CO2S Exporter</title></head>
+    <body>
+    <a href="/metrics">metrics</a>
+    </body>
+	</html>`))
+		if err != nil {
+			return
+		}
+	})
+	err := http.ListenAndServe(*addr, nil)
 	if err != nil {
-		return
+		return err
+	}
+
+	return nil
+}
+
+var (
+	deviceName = kingpin.Flag("device.name", "Specify the UD-CO2S device path.(default /dev/ttyACM0)").Default("/dev/ttyACM0").String()
+	addr       = kingpin.Flag("exporter.addr", "Specifies the address on which the exporter listens (default :9233)").Default(":9233").String()
+)
+
+func main() {
+	kingpin.HelpFlag.Short('h')
+	kingpin.Parse()
+	if err := run(); err != nil {
+		log.Fatal(err)
 	}
 }
