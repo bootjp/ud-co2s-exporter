@@ -25,5 +25,5 @@ jobs:
           goarch: ${{ matrix.goarch }}
           goversion: "https://dl.google.com/go/go1.20.4.linux-amd64.tar.gz"
           project_path: "."
-          asset_name: udco2s-exporter${{ matrix.goos }}-${{ matrix.goarch }}
+          asset_name: udco2s-exporter-${{ matrix.goos }}-${{ matrix.goarch }}
           extra_files: LICENSE README.md
