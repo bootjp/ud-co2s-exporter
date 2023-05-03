@@ -1,8 +1,9 @@
 on:
   release:
     types: [created]
-  tag:
-    types: [created]
+  push:
+    tags:
+      - "v*.*.*"
 
 jobs:
   releases-matrix:
