@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -19,13 +20,21 @@ type Status struct {
 	temp float64
 }
 
+var logger = log.Default()
+var ErrInvalidFormat = errors.New("invalid format")
+
 func parser(data []byte) (Status, error) {
 	line := string(data)
 	line = strings.Replace(line, "\r", "", -1)
 	line = strings.Replace(line, "\n", "", -1)
 	splits := strings.Split(line, ",")
-
 	result := Status{}
+
+	if len(splits) != 3 {
+		logger.Println("invalid format", line)
+		return Status{}, ErrInvalidFormat
+	}
+
 	for _, split := range splits {
 		var err error
 		keyValue := strings.Split(split, "=")
@@ -42,7 +51,8 @@ func parser(data []byte) (Status, error) {
 			result.temp, err = strconv.ParseFloat(keyValue[1], 64)
 		}
 		if err != nil {
-			return Status{}, err
+			logger.Println(err, keyValue[1])
+			return Status{}, ErrInvalidFormat
 		}
 	}
 
@@ -61,26 +71,27 @@ func recordMetrics() {
 		StopBits: serial.OneStopBit,
 	}
 	if err := port.SetMode(mode); err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
 	_, err = port.Write([]byte("STA\r\n"))
 	if err != nil {
-		log.Fatal(err)
+		logger.Println(err)
 	}
 
-	buff := make([]byte, 100)
+	buff := make([]byte, 256)
 	for {
 		n, err := port.Read(buff)
 		if err != nil {
-			break
+			logger.Fatalln(err)
 		}
 		if n == 0 {
-			break
+			continue
 		}
 
 		stat, err := parser(buff[:n])
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
+			continue
 		}
 
 		co2ppm.Set(stat.co2)
@@ -111,12 +122,7 @@ func run() error {
 	http.HandleFunc("/", func(w http.ResponseWriter, request *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		// language=HTML
-		_, err := w.Write([]byte(`<html>
-    <head><title>UD-CO2S Exporter</title></head>
-    <body>
-    <a href="/metrics">metrics</a>
-    </body>
-	</html>`))
+		_, err := w.Write([]byte(`<html><head><title>UD-CO2S Exporter</title></head><body><a href="/metrics">metrics</a></body></html>`))
 		if err != nil {
 			return
 		}
