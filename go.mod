@@ -1,3 +1,3 @@
-module github.com/bootjp/my-go-docker-preset
-
 go 1.19
+
+module github.com/bootjp/UD-CO2S-exporter
