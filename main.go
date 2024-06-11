@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.bug.st/serial"
+	"golang.org/x/sync/errgroup"
 )
 
 type Status struct {
@@ -58,10 +59,10 @@ func parser(data string) (Status, error) {
 	return result, nil
 }
 
-func recordMetrics() {
+func recordMetrics() error {
 	port, err := serial.Open(*deviceName, &serial.Mode{})
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
 	mode := &serial.Mode{
 		BaudRate: 115200,
@@ -70,11 +71,11 @@ func recordMetrics() {
 		StopBits: serial.OneStopBit,
 	}
 	if err := port.SetMode(mode); err != nil {
-		logger.Fatalln(err)
+		return err
 	}
 	_, err = port.Write([]byte("STA\r\n"))
 	if err != nil {
-		logger.Fatalln(err)
+		return err
 	}
 
 	defer func() {
@@ -102,6 +103,8 @@ func recordMetrics() {
 		temperature.Set(stat.temp)
 		humidity.Set(stat.hum)
 	}
+
+	return err
 }
 
 var (
@@ -120,7 +123,8 @@ var (
 )
 
 func run() error {
-	go recordMetrics()
+	e := errgroup.Group{}
+	e.Go(recordMetrics)
 
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, request *http.Request) {
@@ -131,12 +135,11 @@ func run() error {
 			return
 		}
 	})
-	err := http.ListenAndServe(*addr, nil)
-	if err != nil {
-		return err
-	}
+	e.Go(func() error {
+		return http.ListenAndServe(*addr, nil)
+	})
 
-	return nil
+	return e.Wait()
 }
 
 var (

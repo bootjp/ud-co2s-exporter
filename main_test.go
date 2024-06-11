@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestParser(t *testing.T) {
 	tests := []struct {
@@ -49,7 +52,7 @@ func TestParser(t *testing.T) {
 
 	for _, tt := range tests {
 		stat, err := parser(tt.in)
-		if err != tt.err {
+		if !errors.Is(err, tt.err) {
 			t.Errorf("expect error got %v, want %v", stat, tt.out)
 		}
 		if stat != tt.out {
