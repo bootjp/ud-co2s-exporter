@@ -1,4 +1,4 @@
-go 1.19
+go 1.23.1
 
 module github.com/bootjp/UD-CO2S-exporter
 
