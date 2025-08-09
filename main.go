@@ -153,7 +153,10 @@ func run() error {
 			Addr:              *addr,
 			ReadHeaderTimeout: readHeaderTimeout,
 		}
-		return server.ListenAndServe()
+		if err := server.ListenAndServe(); err != nil {
+			return fmt.Errorf("listen and serve: %w", err)
+		}
+		return nil
 	})
 
 	if err := e.Wait(); err != nil {
