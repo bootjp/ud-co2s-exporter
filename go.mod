@@ -6,7 +6,7 @@ require (
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/prometheus/client_golang v1.23.0
 	go.bug.st/serial v1.5.0
-	golang.org/x/sync v0.13.0
+	golang.org/x/sync v0.16.0
 )
 
 require (
