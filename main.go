@@ -3,10 +3,12 @@ package main
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/prometheus/client_golang/prometheus"
@@ -25,12 +27,20 @@ type Status struct {
 var logger = log.Default()
 var ErrInvalidFormat = errors.New("invalid format")
 
+const (
+	expectedDataFields = 3
+	keyValueLength     = 2
+	defaultBaudRate    = 115200
+	defaultDataBits    = 8
+	readHeaderTimeout  = 5 * time.Second
+)
+
 func parser(data string) (Status, error) {
 	data = strings.TrimSuffix(data, "\r\n")
 	splits := strings.Split(data, ",")
 	result := Status{}
 
-	if len(splits) != 3 {
+	if len(splits) != expectedDataFields {
 		logger.Println("invalid format", data)
 		return Status{}, ErrInvalidFormat
 	}
@@ -38,7 +48,7 @@ func parser(data string) (Status, error) {
 	for _, split := range splits {
 		var err error
 		keyValue := strings.Split(split, "=")
-		if len(keyValue) != 2 {
+		if len(keyValue) != keyValueLength {
 			continue
 		}
 
@@ -62,20 +72,19 @@ func parser(data string) (Status, error) {
 func recordMetrics() error {
 	port, err := serial.Open(*deviceName, &serial.Mode{})
 	if err != nil {
-		return err
+		return fmt.Errorf("open serial port: %w", err)
 	}
 	mode := &serial.Mode{
-		BaudRate: 115200,
+		BaudRate: defaultBaudRate,
 		Parity:   serial.NoParity,
-		DataBits: 8,
+		DataBits: defaultDataBits,
 		StopBits: serial.OneStopBit,
 	}
 	if err := port.SetMode(mode); err != nil {
-		return err
+		return fmt.Errorf("set mode: %w", err)
 	}
-	_, err = port.Write([]byte("STA\r\n"))
-	if err != nil {
-		return err
+	if _, err := port.Write([]byte("STA\r\n")); err != nil {
+		return fmt.Errorf("write start command: %w", err)
 	}
 
 	defer func() {
@@ -104,7 +113,10 @@ func recordMetrics() error {
 		humidity.Set(stat.hum)
 	}
 
-	return err
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("scan: %w", err)
+	}
+	return nil
 }
 
 var (
@@ -130,21 +142,38 @@ func run() error {
 	http.HandleFunc("/", func(w http.ResponseWriter, request *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		// language=HTML
-		_, err := w.Write([]byte(`<html><head><title>UD-CO2S Exporter</title></head><body><a href="/metrics">metrics</a></body></html>`))
+		_, err := w.Write([]byte(`<html><head><title>UD-CO2S Exporter</title></head><body>` +
+			`<a href="/metrics">metrics</a></body></html>`))
 		if err != nil {
 			return
 		}
 	})
 	e.Go(func() error {
-		return http.ListenAndServe(*addr, nil)
+		server := &http.Server{
+			Addr:              *addr,
+			ReadHeaderTimeout: readHeaderTimeout,
+		}
+		if err := server.ListenAndServe(); err != nil {
+			return fmt.Errorf("listen and serve: %w", err)
+		}
+		return nil
 	})
 
-	return e.Wait()
+	if err := e.Wait(); err != nil {
+		return fmt.Errorf("run error: %w", err)
+	}
+	return nil
 }
 
 var (
-	deviceName = kingpin.Flag("device.name", "Specify the UD-CO2S device path.(default /dev/ttyACM0)").Default("/dev/ttyACM0").String()
-	addr       = kingpin.Flag("exporter.addr", "Specifies the address on which the exporter listens (default :9233)").Default(":9233").String()
+	deviceName = kingpin.
+			Flag("device.name", "Specify the UD-CO2S device path.(default /dev/ttyACM0)").
+			Default("/dev/ttyACM0").
+			String()
+	addr = kingpin.
+		Flag("exporter.addr", "Specifies the address on which the exporter listens (default :9233)").
+		Default(":9233").
+		String()
 )
 
 func main() {
