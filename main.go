@@ -89,10 +89,10 @@ func recordMetrics() error {
 
 	defer func() {
 		if _, err = port.Write([]byte("STP\r\n")); err != nil {
-			logger.Fatalln(err)
+			logger.Println("write stop command:", err)
 		}
 		if err := port.Close(); err != nil {
-			logger.Fatalln(err)
+			logger.Println("close port:", err)
 		}
 	}()
 
