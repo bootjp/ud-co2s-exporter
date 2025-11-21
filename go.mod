@@ -7,7 +7,7 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
-	github.com/prometheus/common v0.66.1
+	github.com/prometheus/common v0.67.4
 	go.bug.st/serial v1.6.4
 	golang.org/x/sync v0.16.0
 )
