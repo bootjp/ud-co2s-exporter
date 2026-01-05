@@ -9,7 +9,7 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
-	github.com/prometheus/common v0.67.4
+	github.com/prometheus/common v0.67.5
 	go.bug.st/serial v1.6.4
 	golang.org/x/sync v0.19.0
 )
@@ -24,6 +24,6 @@ require (
 	github.com/prometheus/procfs v0.19.2 // indirect
 	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
-	golang.org/x/sys v0.38.0 // indirect
-	google.golang.org/protobuf v1.36.10 // indirect
+	golang.org/x/sys v0.39.0 // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
 )
