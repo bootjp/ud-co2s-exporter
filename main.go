@@ -33,6 +33,9 @@ const (
 	defaultBaudRate    = 115200
 	defaultDataBits    = 8
 	readHeaderTimeout  = 5 * time.Second
+	startCommand       = "STA\r\n"
+	stopCommand        = "STP\r\n"
+	commandHeaderLines = 2
 )
 
 func parser(data string) (Status, error) {
@@ -46,21 +49,12 @@ func parser(data string) (Status, error) {
 	}
 
 	for _, split := range splits {
-		var err error
 		keyValue := strings.Split(split, "=")
 		if len(keyValue) != keyValueLength {
 			continue
 		}
 
-		switch keyValue[0] {
-		case "CO2":
-			result.co2, err = strconv.ParseFloat(keyValue[1], 64)
-		case "HUM":
-			result.hum, err = strconv.ParseFloat(keyValue[1], 64)
-		case "TMP":
-			result.temp, err = strconv.ParseFloat(keyValue[1], 64)
-		}
-		if err != nil {
+		if err := parseKeyValue(keyValue[0], keyValue[1], &result); err != nil {
 			logger.Println(err, split)
 			return Status{}, ErrInvalidFormat
 		}
@@ -69,10 +63,34 @@ func parser(data string) (Status, error) {
 	return result, nil
 }
 
-func recordMetrics() error {
-	port, err := serial.Open(*deviceName, &serial.Mode{})
+func parseKeyValue(key, value string, result *Status) error {
+	switch key {
+	case "CO2":
+		parsed, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return err
+		}
+		result.co2 = parsed
+	case "HUM":
+		parsed, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return err
+		}
+		result.hum = parsed
+	case "TMP":
+		parsed, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return err
+		}
+		result.temp = parsed
+	}
+	return nil
+}
+
+func openSerialPort(device string) (serial.Port, error) {
+	port, err := serial.Open(device, &serial.Mode{})
 	if err != nil {
-		return fmt.Errorf("open serial port: %w", err)
+		return nil, fmt.Errorf("open serial port: %w", err)
 	}
 	mode := &serial.Mode{
 		BaudRate: defaultBaudRate,
@@ -81,14 +99,29 @@ func recordMetrics() error {
 		StopBits: serial.OneStopBit,
 	}
 	if err := port.SetMode(mode); err != nil {
-		return fmt.Errorf("set mode: %w", err)
+		return nil, fmt.Errorf("set mode: %w", err)
 	}
-	if _, err := port.Write([]byte("STA\r\n")); err != nil {
-		return fmt.Errorf("write start command: %w", err)
+	return port, nil
+}
+
+func writeCommand(port serial.Port, command string) error {
+	if _, err := port.Write([]byte(command)); err != nil {
+		return fmt.Errorf("write command %q: %w", strings.TrimSpace(command), err)
+	}
+	return nil
+}
+
+func recordMetrics() error {
+	port, err := openSerialPort(*deviceName)
+	if err != nil {
+		return err
+	}
+	if err := writeCommand(port, startCommand); err != nil {
+		return err
 	}
 
 	defer func() {
-		if _, err = port.Write([]byte("STP\r\n")); err != nil {
+		if err := writeCommand(port, stopCommand); err != nil {
 			logger.Println("write stop command:", err)
 		}
 		if err := port.Close(); err != nil {
@@ -98,8 +131,9 @@ func recordMetrics() error {
 
 	scanner := bufio.NewScanner(port)
 	// skip first 2 lines for command response
-	scanner.Scan()
-	scanner.Scan()
+	for i := 0; i < commandHeaderLines; i++ {
+		scanner.Scan()
+	}
 
 	for scanner.Scan() {
 		stat, err := parser(scanner.Text())
@@ -134,20 +168,26 @@ var (
 	})
 )
 
+func metricsHandler() http.Handler {
+	return promhttp.Handler()
+}
+
+func indexHandler(w http.ResponseWriter, request *http.Request) {
+	w.Header().Set("Content-Type", "text/html")
+	// language=HTML
+	_, err := w.Write([]byte(`<html><head><title>UD-CO2S Exporter</title></head><body>` +
+		`<a href="/metrics">metrics</a></body></html>`))
+	if err != nil {
+		return
+	}
+}
+
 func run() error {
 	e := errgroup.Group{}
 	e.Go(recordMetrics)
 
-	http.Handle("/metrics", promhttp.Handler())
-	http.HandleFunc("/", func(w http.ResponseWriter, request *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		// language=HTML
-		_, err := w.Write([]byte(`<html><head><title>UD-CO2S Exporter</title></head><body>` +
-			`<a href="/metrics">metrics</a></body></html>`))
-		if err != nil {
-			return
-		}
-	})
+	http.Handle("/metrics", metricsHandler())
+	http.HandleFunc("/", indexHandler)
 	e.Go(func() error {
 		server := &http.Server{
 			Addr:              *addr,
