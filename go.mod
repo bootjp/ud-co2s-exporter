@@ -1,6 +1,6 @@
 go 1.24.0
 
-toolchain go1.25.5
+toolchain go1.26.4
 
 module github.com/bootjp/UD-CO2S-exporter
 
