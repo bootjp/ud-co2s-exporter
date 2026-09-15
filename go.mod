@@ -1,4 +1,4 @@
-go 1.25.0
+go 1.26.0
 
 toolchain go1.26.4
 
@@ -11,7 +11,7 @@ require (
 	github.com/prometheus/client_model v0.6.3
 	github.com/prometheus/common v0.69.0
 	go.bug.st/serial v1.8.0
-	golang.org/x/sync v0.21.0
+	golang.org/x/sync v0.23.0
 )
 
 require (
