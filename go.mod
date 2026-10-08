@@ -7,9 +7,9 @@ module github.com/bootjp/UD-CO2S-exporter
 require (
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/creack/pty v1.1.24
-	github.com/prometheus/client_golang v1.24.1
+	github.com/prometheus/client_golang v1.25.0
 	github.com/prometheus/client_model v0.6.3
-	github.com/prometheus/common v0.71.0
+	github.com/prometheus/common v0.72.0
 	go.bug.st/serial v1.8.0
 	golang.org/x/sync v0.23.0
 )
